@@ -1,16 +1,18 @@
 import React, { useState } from "react";
 import { NavLink, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import AlertsBell from "@/components/AlertsBell";
 import {
   LayoutDashboard, Monitor, AlertTriangle, Wrench, Users, Calendar,
   History, BarChart3, UserCog, Settings, LogOut, Menu, X, MessageSquare,
-  FileText, ClipboardList, Server
+  FileText, ClipboardList, Server, WifiOff
 } from "lucide-react";
 
 const NAV = {
   admin: [
     { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
     { to: "/computers", label: "Computers", icon: Monitor },
+    { to: "/alerts", label: "Offline Alerts", icon: WifiOff },
     { to: "/reports", label: "Problem Reports", icon: AlertTriangle },
     { to: "/maintenance", label: "Maintenance", icon: Wrench },
     { to: "/technicians", label: "Technicians", icon: UserCog },
@@ -25,6 +27,7 @@ const NAV = {
     { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
     { to: "/maintenance", label: "My Tasks", icon: Wrench },
     { to: "/computers", label: "Computers", icon: Monitor },
+    { to: "/alerts", label: "Offline Alerts", icon: WifiOff },
     { to: "/history", label: "Maintenance History", icon: History },
     { to: "/troubleshooting", label: "Troubleshooting", icon: MessageSquare },
   ],
@@ -139,6 +142,7 @@ export default function Layout() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {(user?.role === "admin" || user?.role === "technician") && <AlertsBell />}
             <span className="hidden sm:inline text-xs text-gray-500">
               {user?.email}
             </span>

@@ -21,6 +21,7 @@ import Users from "@/pages/Users";
 import Troubleshooting from "@/pages/Troubleshooting";
 import ComputerStatusUser from "@/pages/ComputerStatusUser";
 import Settings from "@/pages/Settings";
+import Alerts from "@/pages/Alerts";
 import "@/App.css";
 
 function Protected({ children, roles }) {
@@ -61,6 +62,7 @@ function App() {
             <Route index element={<RoleDashboard />} />
             <Route path="computers" element={<Protected roles={["admin", "technician"]}><Computers /></Protected>} />
             <Route path="computers/:id" element={<Protected roles={["admin", "technician"]}><ComputerDetails /></Protected>} />
+            <Route path="alerts" element={<Protected roles={["admin", "technician"]}><Alerts /></Protected>} />
             <Route path="reports" element={<Protected roles={["admin"]}><ProblemReports /></Protected>} />
             <Route path="reports/:id" element={<Protected roles={["admin", "technician"]}><ReportDetails /></Protected>} />
             <Route path="report" element={<Protected roles={["user", "admin"]}><ReportProblem /></Protected>} />

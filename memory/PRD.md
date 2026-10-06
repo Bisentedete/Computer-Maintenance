@@ -58,10 +58,12 @@ Build a clean, professional, utilitarian web application called "Computer Labora
 - Tested: /app/test_reports/iteration_3.json (15/15 backend + UI pass).
 - Fleet overview (2026-10-06): `/api/stats.fleet` {total, with_agent, online, offline, no_agent}; `OnlineDot` component; Computers list has Agent column, agent filter, coverage summary, 30 s polling; admin dashboard has Fleet Monitoring card + online dot in status grid. Self-tested via screenshot.
 
+- Offline alerts (2026-10-06): `alerts` collection; background loop every 30 s raises an `offline` alert when `last_heartbeat` > 120 s old, auto-resolves on next telemetry push. `GET /api/alerts` (admin/tech) → {alerts, unread}; `POST /api/alerts/{id}/ack`; `POST /api/alerts/ack-all`. Per-user acknowledgements. Frontend: `AlertsBell` in header (unread badge, panel, dismiss/mark all), `/alerts` page with Active/Resolved tabs, sidebar link "Offline Alerts" for admin + technician. Self-tested via curl + screenshots.
+
 ## Backlog / next tasks
 ### P1 — real integrations
 - Real AI troubleshooting via Emergent LLM key (Claude Sonnet) replacing canned responses
-- Offline alerts: flag computers whose agent stopped reporting
+- Email offline alerts to technicians (Resend)
 
 ### P2 — productivity
 - Email notifications (Resend) when a technician is assigned

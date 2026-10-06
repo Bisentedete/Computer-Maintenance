@@ -6,6 +6,7 @@ load_dotenv(ROOT_DIR / ".env")
 
 import os
 import uuid
+import asyncio
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Literal
@@ -244,7 +245,78 @@ async def ingest_telemetry(computer_id: str, data: TelemetryIn, x_agent_key: str
     res = await db.computers.update_one({"computer_id": computer_id}, {"$set": update})
     if res.matched_count == 0:
         raise HTTPException(404, "Computer not found")
+    await resolve_offline_alert(computer_id)
     return {"ok": True, "received_at": update["last_heartbeat"]}
+
+
+# ---- Offline alerts ----
+async def resolve_offline_alert(computer_id: str):
+    await db.alerts.update_many(
+        {"computer_id": computer_id, "type": "offline", "status": "active"},
+        {"$set": {"status": "resolved", "resolved_at": now_iso()}},
+    )
+
+
+async def check_offline_computers():
+    cutoff = (datetime.now(timezone.utc) - timedelta(seconds=OFFLINE_AFTER_SECONDS)).isoformat()
+    async for c in db.computers.find({"last_heartbeat": {"$exists": True, "$lt": cutoff}}, {"_id": 0, "computer_id": 1, "laboratory": 1, "last_heartbeat": 1}):
+        exists = await db.alerts.find_one({"computer_id": c["computer_id"], "type": "offline", "status": "active"})
+        if exists:
+            continue
+        await db.alerts.insert_one({
+            "id": str(uuid.uuid4()),
+            "type": "offline",
+            "computer_id": c["computer_id"],
+            "laboratory": c.get("laboratory"),
+            "status": "active",
+            "last_heartbeat_at": c["last_heartbeat"],
+            "started_at": now_iso(),
+            "resolved_at": None,
+            "acknowledged_by": [],
+        })
+        logger.info(f"Offline alert raised for {c['computer_id']}")
+    async for a in db.alerts.find({"type": "offline", "status": "active"}, {"_id": 0, "id": 1, "computer_id": 1}):
+        comp = await db.computers.find_one({"computer_id": a["computer_id"]}, {"_id": 0, "last_heartbeat": 1})
+        if comp and comp.get("last_heartbeat", "") >= cutoff:
+            await resolve_offline_alert(a["computer_id"])
+
+
+async def offline_monitor_loop():
+    while True:
+        try:
+            await check_offline_computers()
+        except Exception as e:
+            logger.warning(f"offline check failed: {e}")
+        await asyncio.sleep(30)
+
+
+def alert_view(a: dict, user_id: str) -> dict:
+    a["acknowledged"] = user_id in a.get("acknowledged_by", [])
+    a.pop("acknowledged_by", None)
+    return a
+
+
+@api.get("/alerts")
+async def list_alerts(status: Optional[str] = None, user: dict = Depends(require_roles("admin", "technician"))):
+    q = {"status": status} if status else {}
+    alerts = await db.alerts.find(q, {"_id": 0}).sort("started_at", -1).to_list(200)
+    items = [alert_view(a, user["id"]) for a in alerts]
+    unread = sum(1 for a in items if a["status"] == "active" and not a["acknowledged"])
+    return {"alerts": items, "unread": unread}
+
+
+@api.post("/alerts/{alert_id}/ack")
+async def ack_alert(alert_id: str, user: dict = Depends(require_roles("admin", "technician"))):
+    res = await db.alerts.update_one({"id": alert_id}, {"$addToSet": {"acknowledged_by": user["id"]}})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Alert not found")
+    return {"ok": True}
+
+
+@api.post("/alerts/ack-all")
+async def ack_all_alerts(user: dict = Depends(require_roles("admin", "technician"))):
+    await db.alerts.update_many({"status": "active"}, {"$addToSet": {"acknowledged_by": user["id"]}})
+    return {"ok": True}
 
 
 @api.get("/computers/{computer_id}")
@@ -685,6 +757,7 @@ app.add_middleware(
 @app.on_event("startup")
 async def _startup():
     await seed()
+    asyncio.create_task(offline_monitor_loop())
     logger.info("CLMS backend ready.")
 
 

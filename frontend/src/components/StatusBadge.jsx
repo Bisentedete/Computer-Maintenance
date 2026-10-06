@@ -8,6 +8,7 @@ const MAP = {
   Assigned: "bg-blue-50 text-blue-800 border-blue-200",
   "In Progress": "bg-blue-50 text-blue-800 border-blue-200",
   Resolved: "bg-green-100 text-green-800 border-green-200",
+  Offline: "bg-red-100 text-red-800 border-red-200",
   Completed: "bg-green-100 text-green-800 border-green-200",
   Scheduled: "bg-blue-50 text-blue-800 border-blue-200",
   Cancelled: "bg-gray-100 text-gray-700 border-gray-200",
