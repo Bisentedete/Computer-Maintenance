@@ -36,7 +36,7 @@ Build a clean, professional, utilitarian web application called "Computer Labora
 - Schedules page (list + create modal)
 - Analytics (stats + common problems + top maintenance PCs)
 - Users management (admin only)
-- Troubleshooting chat (canned responses backend keyword-based)
+- Troubleshooting chat — now a GPT-5 assistant (see below); canned endpoint retained
 - User Computer Status page (available / under maintenance / reported)
 - Role-based routing, protected routes, responsive sidebar
 
@@ -68,9 +68,10 @@ Build a clean, professional, utilitarian web application called "Computer Labora
 
 - PDF report (2026-10-06): `GET /api/stats/report.pdf` (admin/technician) builds an A4 PDF via ReportLab (`/app/backend/report_pdf.py`): header with generated time + preparer name, summary stat grid, lab usage bar chart + table, top problem types, top maintenance PCs, active alerts, page footer. `compute_stats()` / `compute_lab_usage()` helpers extracted in server.py. "Generate Report" button on Reports page downloads it (blob) with a sonner toast; `<Toaster>` now mounted in App.js. Verified by rendering the PDF to PNG + browser download.
 
+- AI troubleshooting assistant (2026-10-06): GPT-5 via Emergent LLM key (`emergentintegrations`, `reasoning_effort=low`). `/app/backend/assistant.py` builds live context (specs, agent online/offline, latest + 1 h avg CPU/RAM, active alerts, open reports, recent maintenance) into the system prompt; model appends `<<REPORT: {...}>>` marker when a technician is needed → parsed into `suggestion` and stripped from text. Collections `chat_sessions` {id,user_id,computer_id,title,…} and `chat_messages` {id,session_id,role,content,suggestion,…}. Endpoints: GET/POST `/api/troubleshoot/sessions`, DELETE `/sessions/{id}`, GET `/sessions/{id}/messages`, POST `/sessions/{id}/messages` → SSE (keepalive comment every 5 s; reply persisted even if client disconnects). Frontend: Troubleshooting page rewritten (sessions sidebar, computer picker + live strip, streaming bubbles, `ChatMessage` with "Submit maintenance report" → `/report?from=assistant&computer&type&description`; technicians get `/maintenance/new?computer=`). Old canned `POST /api/troubleshoot` kept. Tested: iteration_4.json (all pass).
+
 ## Backlog / next tasks
 ### P1 — real integrations
-- Real AI troubleshooting via Emergent LLM key (Claude Sonnet) replacing canned responses
 - Email offline alerts to technicians (Resend)
 
 ### P2 — productivity
@@ -86,6 +87,6 @@ Build a clean, professional, utilitarian web application called "Computer Labora
 - Audit log of status changes
 
 ## Known notes
-- Troubleshooting is a mocked canned-reply endpoint by design (per user choice)
+- Troubleshooting assistant uses GPT-5 via EMERGENT_LLM_KEY (credits deducted per message)
 - Computer monitoring values come from the lab-PC agent; computers without an agent show "no agent" (seed values no longer displayed as live)
 - CORS defaults to `*`; set an explicit origin before deploying to production
