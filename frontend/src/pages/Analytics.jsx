@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { PageHeader, Card, CardTitle, StatCard, Button } from "@/components/UI";
-import { BarChart3, CheckCircle2, Clock, FileText } from "lucide-react";
+import { BarChart3, CheckCircle2, Clock, FileText, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import LabUsageChart from "@/components/LabUsageChart";
 
 function Row({ label, value, max }) {
@@ -21,7 +22,24 @@ function Row({ label, value, max }) {
 
 export default function Analytics() {
   const [stats, setStats] = useState(null);
+  const [downloading, setDownloading] = useState(false);
   useEffect(() => { api.get("/stats").then((r) => setStats(r.data)); }, []);
+
+  const downloadPdf = async () => {
+    setDownloading(true);
+    try {
+      const r = await api.get("/stats/report.pdf", { responseType: "blob" });
+      const name = /filename="?([^"]+)"?/.exec(r.headers["content-disposition"] || "")?.[1] || "clms-report.pdf";
+      const url = URL.createObjectURL(r.data);
+      Object.assign(document.createElement("a"), { href: url, download: name }).click();
+      URL.revokeObjectURL(url);
+      toast.success("Report downloaded");
+    } catch {
+      toast.error("Could not generate the report");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   if (!stats) return <div className="text-sm text-gray-500">Loading…</div>;
   const maxProblem = Math.max(1, ...stats.common_problems.map((p) => p.count));
@@ -33,7 +51,7 @@ export default function Analytics() {
         testid="analytics-page"
         title="Reports"
         subtitle="Summary of maintenance activity across the laboratory."
-        actions={<Button variant="outline" testid="generate-report-btn"><FileText size={14} /> Generate Report</Button>}
+        actions={<Button variant="outline" testid="generate-report-btn" onClick={downloadPdf} disabled={downloading}>{downloading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} {downloading ? "Generating…" : "Generate Report"}</Button>}
       />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

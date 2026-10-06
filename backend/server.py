@@ -14,7 +14,8 @@ from typing import List, Optional, Literal
 import bcrypt
 import jwt
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Header
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, Response
+from report_pdf import build_report
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -566,8 +567,7 @@ async def create_schedule(data: ScheduleIn, user: dict = Depends(require_roles("
 
 
 # ---- Dashboard stats ----
-@api.get("/stats")
-async def stats(user: dict = Depends(get_current_user)):
+async def compute_stats() -> dict:
     total = await db.computers.count_documents({})
     operational = await db.computers.count_documents({"status": "Operational"})
     under_maintenance = await db.computers.count_documents({"status": "Under Maintenance"})
@@ -618,8 +618,12 @@ async def stats(user: dict = Depends(get_current_user)):
     }
 
 
-@api.get("/stats/lab-usage")
-async def lab_usage(user: dict = Depends(get_current_user)):
+@api.get("/stats")
+async def stats(user: dict = Depends(get_current_user)):
+    return await compute_stats()
+
+
+async def compute_lab_usage() -> list:
     since = datetime.now(timezone.utc) - timedelta(hours=24)
     pipeline = [
         {"$match": {"ts": {"$gte": since}}},
@@ -651,7 +655,22 @@ async def lab_usage(user: dict = Depends(get_current_user)):
             "peak_cpu": u["peak_cpu"] if u else None,
             "peak_ram": u["peak_ram"] if u else None,
         })
-    return {"labs": out, "window_hours": 24}
+    return out
+
+
+@api.get("/stats/lab-usage")
+async def lab_usage(user: dict = Depends(get_current_user)):
+    return {"labs": await compute_lab_usage(), "window_hours": 24}
+
+
+@api.get("/stats/report.pdf")
+async def stats_report_pdf(user: dict = Depends(require_roles("admin", "technician"))):
+    stats_data = await compute_stats()
+    labs = await compute_lab_usage()
+    alerts = await db.alerts.find({"status": "active"}, {"_id": 0}).sort("started_at", -1).to_list(200)
+    pdf = build_report(stats_data, labs, alerts, user["name"])
+    fname = f"clms-report-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M')}.pdf"
+    return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{fname}"'})
 
 
 @api.get("/stats/technician")

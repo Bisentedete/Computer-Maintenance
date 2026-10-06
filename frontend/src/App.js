@@ -22,6 +22,7 @@ import Troubleshooting from "@/pages/Troubleshooting";
 import ComputerStatusUser from "@/pages/ComputerStatusUser";
 import Settings from "@/pages/Settings";
 import Alerts from "@/pages/Alerts";
+import { Toaster } from "@/components/ui/sonner";
 import "@/App.css";
 
 function Protected({ children, roles }) {
@@ -81,6 +82,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+      <Toaster position="bottom-right" richColors />
     </AuthProvider>
   );
 }

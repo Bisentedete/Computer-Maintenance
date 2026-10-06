@@ -66,6 +66,8 @@ Build a clean, professional, utilitarian web application called "Computer Labora
 
 - Lab usage comparison (2026-10-06): `GET /api/stats/lab-usage` aggregates 24 h `telemetry_samples` joined to computers → per-lab avg/peak CPU & RAM, monitored/total PCs, samples. `LabUsageChart` (Recharts grouped bars + side table, "no data" for labs without agents) on the Reports page. Self-tested via curl + screenshot. Preview DB has synthetic samples for PC-001 (Lab 1), PC-003 (Lab 1), PC-020 (Lab 2).
 
+- PDF report (2026-10-06): `GET /api/stats/report.pdf` (admin/technician) builds an A4 PDF via ReportLab (`/app/backend/report_pdf.py`): header with generated time + preparer name, summary stat grid, lab usage bar chart + table, top problem types, top maintenance PCs, active alerts, page footer. `compute_stats()` / `compute_lab_usage()` helpers extracted in server.py. "Generate Report" button on Reports page downloads it (blob) with a sonner toast; `<Toaster>` now mounted in App.js. Verified by rendering the PDF to PNG + browser download.
+
 ## Backlog / next tasks
 ### P1 — real integrations
 - Real AI troubleshooting via Emergent LLM key (Claude Sonnet) replacing canned responses
@@ -73,7 +75,7 @@ Build a clean, professional, utilitarian web application called "Computer Labora
 
 ### P2 — productivity
 - Email notifications (Resend) when a technician is assigned
-- PDF export on the Analytics "Generate Report" button
+
 - Calendar view on the Schedules page
 - Image upload on Report a Problem (object storage integration)
 
