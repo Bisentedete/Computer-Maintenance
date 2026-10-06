@@ -64,6 +64,8 @@ Build a clean, professional, utilitarian web application called "Computer Labora
 
 - High usage alerts (2026-10-06): same 30 s loop runs `check_high_usage` — for online PCs, if ≥3 samples in the last 5 min are all ≥90% for cpu or ram → alert type `high_cpu`/`high_ram` with `value`+`peak` (updated each cycle); auto-resolves when latest sample <80% (hysteresis). Constants `HIGH_USAGE_*` in server.py. Frontend: `alertMeta` in useAlerts.js, type-aware bell items (Gauge icon, amber), Alerts page renamed "Alerts" with type filter + Details column. Self-tested via curl (raise → 85% stays active → 40% resolves) + screenshot.
 
+- Lab usage comparison (2026-10-06): `GET /api/stats/lab-usage` aggregates 24 h `telemetry_samples` joined to computers → per-lab avg/peak CPU & RAM, monitored/total PCs, samples. `LabUsageChart` (Recharts grouped bars + side table, "no data" for labs without agents) on the Reports page. Self-tested via curl + screenshot. Preview DB has synthetic samples for PC-001 (Lab 1), PC-003 (Lab 1), PC-020 (Lab 2).
+
 ## Backlog / next tasks
 ### P1 — real integrations
 - Real AI troubleshooting via Emergent LLM key (Claude Sonnet) replacing canned responses

@@ -618,6 +618,42 @@ async def stats(user: dict = Depends(get_current_user)):
     }
 
 
+@api.get("/stats/lab-usage")
+async def lab_usage(user: dict = Depends(get_current_user)):
+    since = datetime.now(timezone.utc) - timedelta(hours=24)
+    pipeline = [
+        {"$match": {"ts": {"$gte": since}}},
+        {"$lookup": {"from": "computers", "localField": "computer_id", "foreignField": "computer_id", "as": "c"}},
+        {"$unwind": "$c"},
+        {"$group": {
+            "_id": "$c.laboratory",
+            "avg_cpu": {"$avg": "$cpu"},
+            "avg_ram": {"$avg": "$ram"},
+            "peak_cpu": {"$max": "$cpu"},
+            "peak_ram": {"$max": "$ram"},
+            "samples": {"$sum": 1},
+            "pcs": {"$addToSet": "$computer_id"},
+        }},
+    ]
+    usage = {d["_id"]: d async for d in db.telemetry_samples.aggregate(pipeline)}
+    labs = await db.computers.distinct("laboratory")
+    out = []
+    for lab in sorted(labs):
+        total = await db.computers.count_documents({"laboratory": lab})
+        u = usage.get(lab)
+        out.append({
+            "laboratory": lab,
+            "total_computers": total,
+            "monitored_computers": len(u["pcs"]) if u else 0,
+            "samples": u["samples"] if u else 0,
+            "avg_cpu": round(u["avg_cpu"]) if u else None,
+            "avg_ram": round(u["avg_ram"]) if u else None,
+            "peak_cpu": u["peak_cpu"] if u else None,
+            "peak_ram": u["peak_ram"] if u else None,
+        })
+    return {"labs": out, "window_hours": 24}
+
+
 @api.get("/stats/technician")
 async def tech_stats(user: dict = Depends(require_roles("technician"))):
     assigned = await db.reports.count_documents({"assigned_technician_id": user["id"], "status": "Assigned"})

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { PageHeader, Card, CardTitle, StatCard, Button } from "@/components/UI";
 import { BarChart3, CheckCircle2, Clock, FileText } from "lucide-react";
+import LabUsageChart from "@/components/LabUsageChart";
 
 function Row({ label, value, max }) {
   const pct = max ? Math.round((value / max) * 100) : 0;
@@ -41,6 +42,8 @@ export default function Analytics() {
         <StatCard label="Pending Problems" value={stats.pending_reports} icon={Clock} tone="amber" />
         <StatCard label="In Progress" value={stats.in_progress_reports} icon={Clock} tone="neutral" />
       </div>
+
+      <LabUsageChart />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
