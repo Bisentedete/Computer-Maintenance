@@ -245,8 +245,24 @@ async def ingest_telemetry(computer_id: str, data: TelemetryIn, x_agent_key: str
     res = await db.computers.update_one({"computer_id": computer_id}, {"$set": update})
     if res.matched_count == 0:
         raise HTTPException(404, "Computer not found")
+    await db.telemetry_samples.insert_one({
+        "computer_id": computer_id,
+        "ts": datetime.now(timezone.utc),
+        "cpu": update["cpu_usage"],
+        "ram": update["ram_usage"],
+    })
     await resolve_offline_alert(computer_id)
     return {"ok": True, "received_at": update["last_heartbeat"]}
+
+
+@api.get("/computers/{computer_id}/telemetry/history")
+async def telemetry_history(computer_id: str, user: dict = Depends(get_current_user)):
+    since = datetime.now(timezone.utc) - timedelta(hours=24)
+    cur = db.telemetry_samples.find(
+        {"computer_id": computer_id, "ts": {"$gte": since}}, {"_id": 0, "ts": 1, "cpu": 1, "ram": 1}
+    ).sort("ts", 1)
+    samples = [{"ts": s["ts"].replace(tzinfo=timezone.utc).isoformat(), "cpu": s["cpu"], "ram": s["ram"]} async for s in cur]
+    return {"computer_id": computer_id, "samples": samples}
 
 
 # ---- Offline alerts ----
@@ -596,6 +612,8 @@ async def troubleshoot(data: ChatIn, user: dict = Depends(get_current_user)):
 async def seed():
     await db.users.create_index("email", unique=True)
     await db.computers.create_index("computer_id", unique=True)
+    await db.telemetry_samples.create_index("ts", expireAfterSeconds=24 * 3600)
+    await db.telemetry_samples.create_index([("computer_id", 1), ("ts", 1)])
 
     seed_users = [
         ("admin@lab.edu", "admin123", "Carlos Mendoza", "admin", None),

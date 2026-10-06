@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PageHeader, Card, CardTitle, Th, Td, Empty, Button } from "@/components/UI";
 import StatusBadge from "@/components/StatusBadge";
+import UsageHistoryChart from "@/components/UsageHistoryChart";
 import { ArrowLeft, Wrench, FileText, History, Download } from "lucide-react";
 
 async function downloadAgent() {
@@ -133,6 +134,8 @@ export default function ComputerDetails() {
           )}
         </Card>
       </div>
+
+      <UsageHistoryChart computerId={c.computer_id} refreshKey={c.last_heartbeat} />
 
       <Card className="p-5 mb-4" testid="agent-setup-card">
         <h3 className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-2"><Download size={14} /> Monitoring Agent Setup</h3>

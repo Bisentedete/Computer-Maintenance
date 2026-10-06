@@ -60,6 +60,8 @@ Build a clean, professional, utilitarian web application called "Computer Labora
 
 - Offline alerts (2026-10-06): `alerts` collection; background loop every 30 s raises an `offline` alert when `last_heartbeat` > 120 s old, auto-resolves on next telemetry push. `GET /api/alerts` (admin/tech) → {alerts, unread}; `POST /api/alerts/{id}/ack`; `POST /api/alerts/ack-all`. Per-user acknowledgements. Frontend: `AlertsBell` in header (unread badge, panel, dismiss/mark all), `/alerts` page with Active/Resolved tabs, sidebar link "Offline Alerts" for admin + technician. Self-tested via curl + screenshots.
 
+- Usage history (2026-10-06): every telemetry push stores a sample in `telemetry_samples` {computer_id, ts, cpu, ram} with a 24 h TTL index on `ts`. `GET /api/computers/{id}/telemetry/history` → last-24 h samples. `UsageHistoryChart` (Recharts, CPU + RAM lines, tooltip, avg/peak summary, empty state) on Computer Details; refreshes with each new heartbeat. Self-tested via curl + screenshot. Note: PC-001 has synthetic seeded samples in the preview DB (expire within 24 h).
+
 ## Backlog / next tasks
 ### P1 — real integrations
 - Real AI troubleshooting via Emergent LLM key (Claude Sonnet) replacing canned responses
