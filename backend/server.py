@@ -14,8 +14,10 @@ from typing import List, Optional, Literal
 import bcrypt
 import jwt
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Header
-from fastapi.responses import PlainTextResponse, Response
+from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from report_pdf import build_report
+import assistant
+import json
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -702,6 +704,112 @@ async def troubleshoot(data: ChatIn, user: dict = Depends(get_current_user)):
         if key in msg:
             return {"reply": resp}
     return {"reply": "Thanks for the details. Try restarting the computer first. If the issue continues, please submit a maintenance report so a laboratory technician can take a look."}
+
+
+# ---- AI troubleshooting assistant ----
+class SessionIn(BaseModel):
+    computer_id: Optional[str] = None
+
+
+class SessionMessageIn(BaseModel):
+    message: str
+    computer_id: Optional[str] = None
+
+
+async def get_own_session(session_id: str, user: dict) -> dict:
+    s = await db.chat_sessions.find_one({"id": session_id, "user_id": user["id"]}, {"_id": 0})
+    if not s:
+        raise HTTPException(404, "Session not found")
+    return s
+
+
+@api.get("/troubleshoot/sessions")
+async def list_sessions(user: dict = Depends(get_current_user)):
+    return await db.chat_sessions.find({"user_id": user["id"]}, {"_id": 0}).sort("updated_at", -1).to_list(50)
+
+
+@api.post("/troubleshoot/sessions")
+async def create_session(data: SessionIn, user: dict = Depends(get_current_user)):
+    doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user["id"],
+        "computer_id": data.computer_id,
+        "title": "New conversation",
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+    }
+    await db.chat_sessions.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@api.delete("/troubleshoot/sessions/{session_id}")
+async def delete_session(session_id: str, user: dict = Depends(get_current_user)):
+    await get_own_session(session_id, user)
+    await db.chat_messages.delete_many({"session_id": session_id})
+    await db.chat_sessions.delete_one({"id": session_id})
+    return {"ok": True}
+
+
+@api.get("/troubleshoot/sessions/{session_id}/messages")
+async def list_session_messages(session_id: str, user: dict = Depends(get_current_user)):
+    s = await get_own_session(session_id, user)
+    msgs = await db.chat_messages.find({"session_id": session_id}, {"_id": 0}).sort("created_at", 1).to_list(500)
+    return {"session": s, "messages": msgs}
+
+
+@api.post("/troubleshoot/sessions/{session_id}/messages")
+async def send_session_message(session_id: str, data: SessionMessageIn, user: dict = Depends(get_current_user)):
+    s = await get_own_session(session_id, user)
+    text = data.message.strip()
+    if not text:
+        raise HTTPException(400, "Message is empty")
+    if data.computer_id is not None and data.computer_id != s.get("computer_id"):
+        s["computer_id"] = data.computer_id or None
+        await db.chat_sessions.update_one({"id": session_id}, {"$set": {"computer_id": s["computer_id"]}})
+    history = await db.chat_messages.find({"session_id": session_id}, {"_id": 0}).sort("created_at", 1).to_list(500)
+    user_msg = assistant.new_message(session_id, "user", text)
+    await db.chat_messages.insert_one(dict(user_msg))
+    sess_update = {"updated_at": now_iso()}
+    if not history or s.get("title") == "New conversation":
+        sess_update["title"] = (text[:60] + "…") if len(text) > 60 else text
+
+    async def gen():
+        queue: asyncio.Queue = asyncio.Queue()
+
+        async def producer():
+            try:
+                async for kind, payload in assistant.stream_reply(db, s, history, text):
+                    if kind == "done":
+                        msg = assistant.new_message(session_id, "assistant", payload["content"], payload["suggestion"])
+                        await db.chat_messages.insert_one(dict(msg))
+                        await db.chat_sessions.update_one({"id": session_id}, {"$set": sess_update})
+                        msg.pop("_id", None)
+                        payload = msg
+                    await queue.put((kind, payload))
+            except Exception as e:
+                logger.exception("assistant stream failed")
+                await queue.put(("error", str(e)))
+            await queue.put(None)
+
+        asyncio.create_task(producer())
+        while True:
+            try:
+                item = await asyncio.wait_for(queue.get(), timeout=5)
+            except asyncio.TimeoutError:
+                yield ": keepalive\n\n"
+                continue
+            if item is None:
+                break
+            kind, payload = item
+            if kind == "delta":
+                yield f"data: {json.dumps({'type': 'delta', 'content': payload})}\n\n"
+            elif kind == "error":
+                yield f"data: {json.dumps({'type': 'error', 'detail': payload})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'done', 'message': payload})}\n\n"
+
+    return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ---- Seed ----

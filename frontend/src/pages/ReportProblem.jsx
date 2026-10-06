@@ -25,9 +25,9 @@ export default function ReportProblem() {
   const [done, setDone] = useState(false);
   const [form, setForm] = useState({
     computer_id: params.get("computer") || "",
-    problem_type: PROBLEMS[0],
-    description: "",
-    additional_details: "",
+    problem_type: PROBLEMS.includes(params.get("type")) ? params.get("type") : PROBLEMS[0],
+    description: params.get("description") || "",
+    additional_details: params.get("from") === "assistant" ? "Pre-filled from the troubleshooting assistant conversation." : "",
   });
 
   useEffect(() => {
