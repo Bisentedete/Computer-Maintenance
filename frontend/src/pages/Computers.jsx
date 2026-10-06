@@ -3,8 +3,11 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PageHeader, Card, Th, Td, Empty, Button, Input, Select } from "@/components/UI";
 import StatusBadge from "@/components/StatusBadge";
+import OnlineDot from "@/components/OnlineDot";
 import { Plus, Search } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+
+const agentState = (c) => (c.monitoring !== "live" ? "No agent" : c.online ? "Online" : "Offline");
 
 export default function Computers() {
   const { user } = useAuth();
@@ -12,19 +15,30 @@ export default function Computers() {
   const [q, setQ] = useState("");
   const [lab, setLab] = useState("All");
   const [status, setStatus] = useState("All");
+  const [agent, setAgent] = useState("All");
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({
     computer_id: "", laboratory: "Computer Lab 1", processor: "", ram: "", storage: "", operating_system: "",
   });
 
   const load = () => api.get("/computers").then((r) => setList(r.data));
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
+  }, []);
 
   const labs = useMemo(() => ["All", ...Array.from(new Set(list.map((c) => c.laboratory)))], [list]);
+  const fleet = useMemo(() => ({
+    online: list.filter((c) => agentState(c) === "Online").length,
+    offline: list.filter((c) => agentState(c) === "Offline").length,
+    noAgent: list.filter((c) => agentState(c) === "No agent").length,
+  }), [list]);
 
   const filtered = list.filter((c) =>
     (lab === "All" || c.laboratory === lab) &&
     (status === "All" || c.status === status) &&
+    (agent === "All" || agentState(c) === agent) &&
     (q === "" || c.computer_id.toLowerCase().includes(q.toLowerCase()))
   );
 
@@ -61,6 +75,15 @@ export default function Computers() {
           <Select data-testid="filter-status" value={status} onChange={(e) => setStatus(e.target.value)}>
             {["All", "Operational", "Under Maintenance", "Reported Problem"].map((s) => <option key={s}>{s}</option>)}
           </Select>
+          <Select data-testid="filter-agent" value={agent} onChange={(e) => setAgent(e.target.value)}>
+            {["All", "Online", "Offline", "No agent"].map((s) => <option key={s} value={s}>{s === "All" ? "All agents" : s}</option>)}
+          </Select>
+        </div>
+        <div data-testid="fleet-summary" className="px-3 py-2 border-t border-gray-100 flex flex-wrap gap-4 text-xs text-gray-600">
+          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-green-500" /> <span data-testid="fleet-online">{fleet.online}</span> online</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-red-500" /> <span data-testid="fleet-offline">{fleet.offline}</span> offline</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-gray-300" /> <span data-testid="fleet-no-agent">{fleet.noAgent}</span> without agent</span>
+          <span className="ml-auto text-gray-400">Agent coverage {list.length ? Math.round(((fleet.online + fleet.offline) / list.length) * 100) : 0}% · refreshes every 30 s</span>
         </div>
       </Card>
 
@@ -70,17 +93,18 @@ export default function Computers() {
             <thead>
               <tr>
                 <Th>Computer ID</Th><Th>Laboratory</Th><Th>Status</Th>
-                <Th>Condition</Th><Th>Last Maintenance</Th><Th></Th>
+                <Th>Agent</Th><Th>Condition</Th><Th>Last Maintenance</Th><Th></Th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
-                <tr><td colSpan={6}><Empty /></td></tr>
+                <tr><td colSpan={7}><Empty /></td></tr>
               ) : filtered.map((c) => (
                 <tr key={c.computer_id} className="hover:bg-gray-50 transition-colors">
                   <Td className="font-mono font-medium text-gray-900">{c.computer_id}</Td>
                   <Td>{c.laboratory}</Td>
                   <Td><StatusBadge value={c.status} /></Td>
+                  <Td><OnlineDot computer={c} testid={`agent-${c.computer_id}`} /></Td>
                   <Td><StatusBadge value={c.condition} /></Td>
                   <Td className="text-gray-500">{new Date(c.last_maintenance).toLocaleDateString()}</Td>
                   <Td><Link to={`/computers/${c.computer_id}`} className="text-xs text-blue-800 hover:underline">View</Link></Td>

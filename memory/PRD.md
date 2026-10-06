@@ -56,11 +56,12 @@ Build a clean, professional, utilitarian web application called "Computer Labora
 - `GET /api/agent/download` (admin/technician) — serves `/app/backend/agent.py` with server URL (Origin header or `PUBLIC_URL` env) and key pre-filled. Agent uses psutil, custom User-Agent (Cloudflare blocks python-urllib default), `python agent.py --id PC-001 [--interval 10]`.
 - Computer Details page polls every 10 s; shows live / offline / no agent states + Monitoring Agent Setup card with download button.
 - Tested: /app/test_reports/iteration_3.json (15/15 backend + UI pass).
+- Fleet overview (2026-10-06): `/api/stats.fleet` {total, with_agent, online, offline, no_agent}; `OnlineDot` component; Computers list has Agent column, agent filter, coverage summary, 30 s polling; admin dashboard has Fleet Monitoring card + online dot in status grid. Self-tested via screenshot.
 
 ## Backlog / next tasks
 ### P1 — real integrations
 - Real AI troubleshooting via Emergent LLM key (Claude Sonnet) replacing canned responses
-- Fleet online/offline overview on Computers list + admin dashboard (data already available via `monitoring`/`online`)
+- Offline alerts: flag computers whose agent stopped reporting
 
 ### P2 — productivity
 - Email notifications (Resend) when a technician is assigned

@@ -464,7 +464,18 @@ async def stats(user: dict = Depends(get_current_user)):
     ]
     top_pcs = [{"computer_id": d["_id"], "count": d["count"]} async for d in db.maintenance_records.aggregate(pc_pipe)]
 
+    comps = [apply_liveness(c) async for c in db.computers.find({}, {"_id": 0, "monitoring": 1, "last_heartbeat": 1})]
+    with_agent = sum(1 for c in comps if c["monitoring"] == "live")
+    online = sum(1 for c in comps if c["online"])
+
     return {
+        "fleet": {
+            "total": total,
+            "with_agent": with_agent,
+            "online": online,
+            "offline": with_agent - online,
+            "no_agent": total - with_agent,
+        },
         "total_computers": total,
         "operational": operational,
         "under_maintenance": under_maintenance,
