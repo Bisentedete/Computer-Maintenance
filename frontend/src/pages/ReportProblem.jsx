@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
-import { PageHeader, Card, Label, Button, Select, Textarea } from "@/components/UI";
+import { PageHeader, Card, Label, Button, Textarea } from "@/components/UI";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { CheckCircle2 } from "lucide-react";
 
 const PROBLEMS = [
@@ -35,6 +36,7 @@ export default function ReportProblem() {
 
   const submit = async (e) => {
     e.preventDefault();
+    if (!form.computer_id) return;
     await api.post("/reports", form);
     setDone(true);
   };
@@ -43,7 +45,7 @@ export default function ReportProblem() {
     return (
       <div>
         <PageHeader title="Report submitted" />
-        <Card className="p-8 text-center max-w-md">
+        <Card className="p-8 text-center max-w-md" testid="report-success">
           <div className="mx-auto h-10 w-10 rounded-full bg-green-100 text-green-700 flex items-center justify-center mb-3">
             <CheckCircle2 size={20} />
           </div>
@@ -69,20 +71,31 @@ export default function ReportProblem() {
         <form onSubmit={submit} className="space-y-4">
           <div>
             <Label>Computer</Label>
-            <Select data-testid="select-computer" value={form.computer_id} onChange={(e) => setForm({ ...form, computer_id: e.target.value })} required className="w-full">
-              <option value="">— Select computer —</option>
-              {computers.map((c) => (
-                <option key={c.computer_id} value={c.computer_id}>
-                  {c.computer_id} — {c.laboratory}
-                </option>
-              ))}
+            <Select value={form.computer_id} onValueChange={(v) => setForm({ ...form, computer_id: v })}>
+              <SelectTrigger data-testid="select-computer" className="w-full">
+                <SelectValue placeholder="— Select computer —" />
+              </SelectTrigger>
+              <SelectContent>
+                {computers.map((c) => (
+                  <SelectItem key={c.computer_id} value={c.computer_id} data-testid={`option-${c.computer_id}`}>
+                    {c.computer_id} — {c.laboratory}
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
 
           <div>
             <Label>Problem Type</Label>
-            <Select data-testid="select-problem-type" value={form.problem_type} onChange={(e) => setForm({ ...form, problem_type: e.target.value })} className="w-full">
-              {PROBLEMS.map((p) => <option key={p}>{p}</option>)}
+            <Select value={form.problem_type} onValueChange={(v) => setForm({ ...form, problem_type: v })}>
+              <SelectTrigger data-testid="select-problem-type" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PROBLEMS.map((p) => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
 

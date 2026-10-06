@@ -33,7 +33,7 @@ const NAV = {
     { to: "/report", label: "Report a Problem", icon: AlertTriangle },
     { to: "/my-reports", label: "My Reports", icon: ClipboardList },
     { to: "/computer-status", label: "Computer Status", icon: Server },
-    { to: "/troubleshooting", label: "Troubleshooting Support", icon: MessageSquare },
+    { to: "/troubleshooting", label: "Troubleshooting", icon: MessageSquare },
   ],
 };
 
