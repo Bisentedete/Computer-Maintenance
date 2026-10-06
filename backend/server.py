@@ -29,6 +29,10 @@ JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALG = "HS256"
 AGENT_API_KEY = os.environ["AGENT_API_KEY"]
 OFFLINE_AFTER_SECONDS = 120
+HIGH_USAGE_PCT = 90
+HIGH_USAGE_CLEAR_PCT = 80
+HIGH_USAGE_WINDOW_MINUTES = 5
+HIGH_USAGE_MIN_SAMPLES = 3
 
 app = FastAPI(title="Computer Laboratory Maintenance System")
 api = APIRouter(prefix="/api")
@@ -297,12 +301,49 @@ async def check_offline_computers():
             await resolve_offline_alert(a["computer_id"])
 
 
+async def check_high_usage():
+    cutoff = (datetime.now(timezone.utc) - timedelta(seconds=OFFLINE_AFTER_SECONDS)).isoformat()
+    window = datetime.now(timezone.utc) - timedelta(minutes=HIGH_USAGE_WINDOW_MINUTES)
+    async for c in db.computers.find({"last_heartbeat": {"$gte": cutoff}}, {"_id": 0, "computer_id": 1, "laboratory": 1}):
+        samples = await db.telemetry_samples.find(
+            {"computer_id": c["computer_id"], "ts": {"$gte": window}}, {"_id": 0, "cpu": 1, "ram": 1}
+        ).sort("ts", 1).to_list(1000)
+        if not samples:
+            continue
+        for metric in ("cpu", "ram"):
+            atype = f"high_{metric}"
+            latest = samples[-1][metric]
+            active = await db.alerts.find_one({"computer_id": c["computer_id"], "type": atype, "status": "active"})
+            if active:
+                if latest < HIGH_USAGE_CLEAR_PCT:
+                    await db.alerts.update_one({"id": active["id"]}, {"$set": {"status": "resolved", "resolved_at": now_iso(), "value": latest}})
+                else:
+                    await db.alerts.update_one({"id": active["id"]}, {"$set": {"value": latest, "peak": max(active.get("peak", 0), latest)}})
+                continue
+            if len(samples) >= HIGH_USAGE_MIN_SAMPLES and all(s[metric] >= HIGH_USAGE_PCT for s in samples):
+                await db.alerts.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "type": atype,
+                    "metric": metric,
+                    "computer_id": c["computer_id"],
+                    "laboratory": c.get("laboratory"),
+                    "status": "active",
+                    "value": latest,
+                    "peak": max(s[metric] for s in samples),
+                    "started_at": now_iso(),
+                    "resolved_at": None,
+                    "acknowledged_by": [],
+                })
+                logger.info(f"High {metric.upper()} alert raised for {c['computer_id']} ({latest}%)")
+
+
 async def offline_monitor_loop():
     while True:
         try:
             await check_offline_computers()
+            await check_high_usage()
         except Exception as e:
-            logger.warning(f"offline check failed: {e}")
+            logger.warning(f"monitor check failed: {e}")
         await asyncio.sleep(30)
 
 

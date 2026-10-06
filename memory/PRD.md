@@ -62,6 +62,8 @@ Build a clean, professional, utilitarian web application called "Computer Labora
 
 - Usage history (2026-10-06): every telemetry push stores a sample in `telemetry_samples` {computer_id, ts, cpu, ram} with a 24 h TTL index on `ts`. `GET /api/computers/{id}/telemetry/history` → last-24 h samples. `UsageHistoryChart` (Recharts, CPU + RAM lines, tooltip, avg/peak summary, empty state) on Computer Details; refreshes with each new heartbeat. Self-tested via curl + screenshot. Note: PC-001 has synthetic seeded samples in the preview DB (expire within 24 h).
 
+- High usage alerts (2026-10-06): same 30 s loop runs `check_high_usage` — for online PCs, if ≥3 samples in the last 5 min are all ≥90% for cpu or ram → alert type `high_cpu`/`high_ram` with `value`+`peak` (updated each cycle); auto-resolves when latest sample <80% (hysteresis). Constants `HIGH_USAGE_*` in server.py. Frontend: `alertMeta` in useAlerts.js, type-aware bell items (Gauge icon, amber), Alerts page renamed "Alerts" with type filter + Details column. Self-tested via curl (raise → 85% stays active → 40% resolves) + screenshot.
+
 ## Backlog / next tasks
 ### P1 — real integrations
 - Real AI troubleshooting via Emergent LLM key (Claude Sonnet) replacing canned responses

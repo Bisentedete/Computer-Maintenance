@@ -25,3 +25,11 @@ export function timeAgo(iso) {
   if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
   return `${Math.floor(s / 86400)} d ago`;
 }
+
+export const ALERT_META = {
+  offline: { label: "Offline", badge: "Offline", describe: (a) => `went dark ${timeAgo(a.started_at)}` },
+  high_cpu: { label: "High CPU", badge: "High CPU", describe: (a) => `CPU ${a.value}% for ${timeAgo(a.started_at).replace(" ago", "")}` },
+  high_ram: { label: "High RAM", badge: "High RAM", describe: (a) => `RAM ${a.value}% for ${timeAgo(a.started_at).replace(" ago", "")}` },
+};
+
+export const alertMeta = (a) => ALERT_META[a.type] || ALERT_META.offline;
