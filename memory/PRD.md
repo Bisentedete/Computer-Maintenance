@@ -50,10 +50,17 @@ Build a clean, professional, utilitarian web application called "Computer Labora
 ## Backend endpoints (prefixed `/api`)
 `POST /auth/login` · `GET /auth/me` · `GET /users` · `GET /technicians` · `GET /computers` · `GET /computers/{id}` · `POST /computers` · `GET /reports` · `GET /reports/{id}` · `POST /reports` · `POST /reports/{id}/assign` · `PATCH /reports/{id}` · `GET /maintenance` · `POST /maintenance` · `GET /schedules` · `POST /schedules` · `GET /stats` · `GET /stats/technician` · `POST /troubleshoot`
 
+## Monitoring agent (implemented 2026-10-06)
+- `POST /api/computers/{id}/telemetry` — header `X-Agent-Key` (= `AGENT_API_KEY` in backend .env); body cpu/ram/storage (0-100), hostname, os_name, uptime_seconds. Sets `last_heartbeat`.
+- `online` derived server-side: heartbeat within 120 s → online; `monitoring` = `live` | `none`.
+- `GET /api/agent/download` (admin/technician) — serves `/app/backend/agent.py` with server URL (Origin header or `PUBLIC_URL` env) and key pre-filled. Agent uses psutil, custom User-Agent (Cloudflare blocks python-urllib default), `python agent.py --id PC-001 [--interval 10]`.
+- Computer Details page polls every 10 s; shows live / offline / no agent states + Monitoring Agent Setup card with download button.
+- Tested: /app/test_reports/iteration_3.json (15/15 backend + UI pass).
+
 ## Backlog / next tasks
 ### P1 — real integrations
 - Real AI troubleshooting via Emergent LLM key (Claude Sonnet) replacing canned responses
-- Monitoring agent ingest endpoint (POST /api/computers/{id}/telemetry) feeding CPU/RAM/Storage from a cron/worker
+- Fleet online/offline overview on Computers list + admin dashboard (data already available via `monitoring`/`online`)
 
 ### P2 — productivity
 - Email notifications (Resend) when a technician is assigned
@@ -69,5 +76,5 @@ Build a clean, professional, utilitarian web application called "Computer Labora
 
 ## Known notes
 - Troubleshooting is a mocked canned-reply endpoint by design (per user choice)
-- Computer monitoring values (cpu/ram/storage/online) are placeholder seed values awaiting a real agent
+- Computer monitoring values come from the lab-PC agent; computers without an agent show "no agent" (seed values no longer displayed as live)
 - CORS defaults to `*`; set an explicit origin before deploying to production

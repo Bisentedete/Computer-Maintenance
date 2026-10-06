@@ -1,0 +1,35 @@
+{
+  "summary": "Tested new telemetry/monitoring feature end-to-end (backend + frontend) + regression. 15/15 pytest tests passed and all Playwright UI assertions passed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_coverage": {
+    "backend": [
+      "POST /api/computers/{id}/telemetry: valid push 200, wrong key 401, missing key 401, unknown computer 404, out-of-range 422",
+      "GET /api/computers/{id}: live monitoring with correct cpu/ram/storage/hostname after push; PC-050 returns monitoring='none', online=false, no last_heartbeat",
+      "GET /api/computers list includes monitoring/online fields",
+      "GET /api/agent/download: admin & technician 200 with Content-Disposition attachment filename=agent.py, placeholders substituted, AGENT_API_KEY present; user 403; no token 401",
+      "Regression: /api/stats, /api/reports, /api/computers list"
+    ],
+    "frontend": [
+      "Admin login works",
+      "/computers/PC-001 monitoring-card shows mode='live', online-status='Online', three usage bars, last-heartbeat text with 'Last heartbeat:' and uptime",
+      "/computers/PC-050 shows mode='no agent', online-status='Offline', no-agent-notice visible, bars hidden",
+      "agent-setup-card: download-agent-btn triggers download of agent.py file; agent-run-cmd text 'python agent.py --id PC-001'",
+      "Polling: pushed cpu=88 via API, waited 13s, UI auto-refreshed to show 88% without reload",
+      "Regression: computers list page and reports page load"
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_telemetry.py", "/app/test_reports/pytest/pytest_telemetry.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "download_agent uses request.headers['origin'] which may be absent for direct GETs; falls back to request.base_url which is typically the internal URL. PUBLIC_URL env can be set for safer substitution.",
+    "apply_liveness returns monitoring='live' even when offline (age > 120s). The frontend compensates by checking c.online, but semantically the mode could be 'offline' separate from 'live'. Current test expectations are satisfied."
+  ],
+  "updated_files": ["/app/backend/tests/test_telemetry.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "admin@lab.edu/admin123, tech@lab.edu/tech123, user@lab.edu/user123; Agent key clms-agent-key-7f3a9c2e",
+  "seed_data_creation": "None — used seeded PC-001 (pushed telemetry) and PC-050 (no telemetry)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Telemetry feature fully functional. Backend tests live at /app/backend/tests/test_telemetry.py (15 tests). Backend test_credentials and AGENT_API_KEY are stable."
+}
