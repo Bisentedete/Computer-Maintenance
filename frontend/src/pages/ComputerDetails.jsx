@@ -3,7 +3,15 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { PageHeader, Card, CardTitle, Th, Td, Empty, Button } from "@/components/UI";
 import StatusBadge from "@/components/StatusBadge";
-import { ArrowLeft, Wrench, FileText, History } from "lucide-react";
+import { ArrowLeft, Wrench, FileText, History, Download } from "lucide-react";
+
+async function downloadAgent() {
+  const r = await api.get("/agent/download", { responseType: "blob" });
+  const url = URL.createObjectURL(r.data);
+  const a = Object.assign(document.createElement("a"), { href: url, download: "agent.py" });
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 function Row({ label, value, mono }) {
   return (
@@ -35,10 +43,18 @@ export default function ComputerDetails() {
   const [c, setC] = useState(null);
 
   useEffect(() => {
-    api.get(`/computers/${id}`).then((r) => setC(r.data));
+    let active = true;
+    const load = () => api.get(`/computers/${id}`).then((r) => active && setC(r.data));
+    load();
+    const t = setInterval(load, 10000);
+    return () => { active = false; clearInterval(t); };
   }, [id]);
 
   if (!c) return <div className="text-sm text-gray-500">Loading…</div>;
+
+  const live = c.monitoring === "live";
+  const monitorLabel = !live ? "no agent" : c.online ? "live" : "offline";
+  const monitorClass = !live ? "text-gray-400" : c.online ? "text-green-700" : "text-red-600";
 
   return (
     <div>
@@ -70,22 +86,31 @@ export default function ComputerDetails() {
           <Row label="Date Added" value={new Date(c.created_at).toLocaleDateString()} />
         </Card>
 
-        <Card className="p-5">
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">
+        <Card className="p-5" testid="monitoring-card">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
             Current Status
-            <span className="ml-2 text-[10px] font-normal uppercase tracking-wider text-gray-400">placeholder — monitoring API</span>
+            <span data-testid="monitoring-mode" className={`ml-2 text-[10px] font-normal uppercase tracking-wider ${monitorClass}`}>{monitorLabel}</span>
+            {live && c.online && <span className="ml-auto text-[10px] text-gray-400">refreshes every 10 s</span>}
           </h3>
           <div className="flex items-center gap-2 mb-4">
             <span className={`h-2 w-2 rounded-full ${c.online ? "bg-green-500" : "bg-gray-400"}`} />
-            <span className="text-sm text-gray-900">{c.online ? "Online" : "Offline"}</span>
+            <span data-testid="online-status" className="text-sm text-gray-900">{c.online ? "Online" : "Offline"}</span>
+            {c.hostname && <span className="text-xs text-gray-500 font-mono ml-auto">{c.hostname}</span>}
           </div>
-          <div className="space-y-3">
-            <Bar label="CPU usage" value={c.cpu_usage ?? 0} />
-            <Bar label="RAM usage" value={c.ram_usage ?? 0} />
-            <Bar label="Storage usage" value={c.storage_usage ?? 0} />
-          </div>
-          <div className="text-[11px] text-gray-500 mt-4">
-            Last check: {new Date(c.last_check).toLocaleString()}
+          {live ? (
+            <div className="space-y-3">
+              <Bar label="CPU usage" value={c.cpu_usage ?? 0} />
+              <Bar label="RAM usage" value={c.ram_usage ?? 0} />
+              <Bar label="Storage usage" value={c.storage_usage ?? 0} />
+            </div>
+          ) : (
+            <div data-testid="no-agent-notice" className="text-xs text-gray-500 border border-dashed border-gray-200 rounded p-3">
+              No monitoring agent has reported for this computer yet. Install the agent below to see live CPU, RAM and storage.
+            </div>
+          )}
+          <div className="text-[11px] text-gray-500 mt-4" data-testid="last-heartbeat">
+            {c.last_heartbeat ? `Last heartbeat: ${new Date(c.last_heartbeat).toLocaleString()}` : "Last heartbeat: never"}
+            {c.uptime_seconds != null && ` · Uptime ${Math.floor(c.uptime_seconds / 3600)}h ${Math.floor((c.uptime_seconds % 3600) / 60)}m`}
           </div>
         </Card>
 
@@ -108,6 +133,19 @@ export default function ComputerDetails() {
           )}
         </Card>
       </div>
+
+      <Card className="p-5 mb-4" testid="agent-setup-card">
+        <h3 className="text-sm font-semibold text-gray-900 mb-1 flex items-center gap-2"><Download size={14} /> Monitoring Agent Setup</h3>
+        <p className="text-xs text-gray-500 mb-3">Run this on {c.computer_id} to push CPU, RAM, storage and online status every 10 seconds.</p>
+        <ol className="text-xs text-gray-700 space-y-2 list-decimal list-inside">
+          <li>
+            <button data-testid="download-agent-btn" onClick={downloadAgent} className="text-blue-800 hover:underline">Download agent.py</button>
+            <span className="text-gray-500"> (server URL and API key are pre-filled)</span>
+          </li>
+          <li>Install the dependency: <code className="font-mono bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded">pip install psutil</code></li>
+          <li>Start the agent: <code data-testid="agent-run-cmd" className="font-mono bg-gray-50 border border-gray-200 px-1.5 py-0.5 rounded">python agent.py --id {c.computer_id}</code></li>
+        </ol>
+      </Card>
 
       <Card>
         <CardTitle right={<span className="text-xs text-gray-500 flex items-center gap-1"><History size={12} /> {c.maintenance_history.length} records</span>}>

@@ -12,7 +12,8 @@ from typing import List, Optional, Literal
 
 import bcrypt
 import jwt
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Header
+from fastapi.responses import PlainTextResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -25,6 +26,8 @@ db = client[os.environ["DB_NAME"]]
 
 JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALG = "HS256"
+AGENT_API_KEY = os.environ["AGENT_API_KEY"]
+OFFLINE_AFTER_SECONDS = 120
 
 app = FastAPI(title="Computer Laboratory Maintenance System")
 api = APIRouter(prefix="/api")
@@ -37,6 +40,18 @@ logger = logging.getLogger("clms")
 # ---- helpers ----
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def apply_liveness(c: dict) -> dict:
+    hb = c.get("last_heartbeat")
+    if not hb:
+        c["online"] = False
+        c["monitoring"] = "none"
+        return c
+    age = (datetime.now(timezone.utc) - datetime.fromisoformat(hb)).total_seconds()
+    c["online"] = age <= OFFLINE_AFTER_SECONDS
+    c["monitoring"] = "live"
+    return c
 
 
 def hash_password(pw: str) -> str:
@@ -145,6 +160,15 @@ class ChatIn(BaseModel):
     message: str
 
 
+class TelemetryIn(BaseModel):
+    cpu_usage: float = Field(ge=0, le=100)
+    ram_usage: float = Field(ge=0, le=100)
+    storage_usage: float = Field(ge=0, le=100)
+    hostname: Optional[str] = None
+    os_name: Optional[str] = None
+    uptime_seconds: Optional[int] = None
+
+
 # ---- Auth routes ----
 @api.post("/auth/login")
 async def login(data: LoginIn):
@@ -189,7 +213,38 @@ async def list_technicians(user: dict = Depends(get_current_user)):
 @api.get("/computers")
 async def list_computers(user: dict = Depends(get_current_user)):
     comps = await db.computers.find({}, {"_id": 0}).sort("computer_id", 1).to_list(1000)
-    return comps
+    return [apply_liveness(c) for c in comps]
+
+
+@api.get("/agent/download", response_class=PlainTextResponse)
+async def download_agent(request: Request, user: dict = Depends(require_roles("admin", "technician"))):
+    src = (ROOT_DIR / "agent.py").read_text()
+    server_url = os.environ.get("PUBLIC_URL") or request.headers.get("origin") or str(request.base_url).rstrip("/")
+    src = src.replace("__SERVER_URL__", server_url).replace("__AGENT_KEY__", AGENT_API_KEY)
+    return PlainTextResponse(src, headers={"Content-Disposition": "attachment; filename=agent.py"})
+
+
+@api.post("/computers/{computer_id}/telemetry")
+async def ingest_telemetry(computer_id: str, data: TelemetryIn, x_agent_key: str = Header(default="")):
+    if x_agent_key != AGENT_API_KEY:
+        raise HTTPException(401, "Invalid agent key")
+    update = {
+        "cpu_usage": round(data.cpu_usage),
+        "ram_usage": round(data.ram_usage),
+        "storage_usage": round(data.storage_usage),
+        "last_heartbeat": now_iso(),
+        "last_check": now_iso(),
+    }
+    if data.hostname:
+        update["hostname"] = data.hostname
+    if data.os_name:
+        update["agent_os"] = data.os_name
+    if data.uptime_seconds is not None:
+        update["uptime_seconds"] = data.uptime_seconds
+    res = await db.computers.update_one({"computer_id": computer_id}, {"$set": update})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Computer not found")
+    return {"ok": True, "received_at": update["last_heartbeat"]}
 
 
 @api.get("/computers/{computer_id}")
@@ -206,7 +261,7 @@ async def get_computer(computer_id: str, user: dict = Depends(get_current_user))
     history = await db.maintenance_records.find({"computer_id": computer_id}, {"_id": 0}).sort("date_fixed", -1).to_list(100)
     c["current_problem"] = cp
     c["maintenance_history"] = history
-    return c
+    return apply_liveness(c)
 
 
 @api.post("/computers")
