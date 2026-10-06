@@ -1,0 +1,4 @@
+/* Minimal, no decorative styles */
+.App {
+    min-height: 100vh;
+}

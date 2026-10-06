@@ -1,0 +1,78 @@
+{
+  "theme": "light_only",
+  "design_philosophy": "Utilitarian school IT management tool. Pure function over form. Zero 'AI' or 'futuristic' aesthetics. Reliable, clear, and high-density.",
+  "typography": {
+    "primary_font": "IBM Plex Sans",
+    "monospace_font": "IBM Plex Mono",
+    "headings": "IBM Plex Sans, sans-serif. Weights: 500 (Medium), 600 (SemiBold). Avoid overly bold or thin weights.",
+    "body": "IBM Plex Sans, sans-serif. Weight: 400 (Regular).",
+    "data_display": "IBM Plex Mono for IP addresses, PC labels (e.g., LAB-01-PC-12), and MAC addresses.",
+    "sizing_rules": "Strict hierarchy. H1 max text-2xl. H2 text-xl. Body text-sm for density. Data tables text-sm."
+  },
+  "colors": {
+    "background": "#F9FAFB",
+    "surface": "#FFFFFF",
+    "text_primary": "#111827",
+    "text_secondary": "#4B5563",
+    "border": "#D1D5DB",
+    "brand_primary": {
+      "DEFAULT": "#1E40AF",
+      "hover": "#1E3A8A",
+      "foreground": "#FFFFFF"
+    },
+    "semantic": {
+      "operational_bg": "#DCFCE7",
+      "operational_text": "#166534",
+      "warning_bg": "#FEF3C7",
+      "warning_text": "#B45309",
+      "critical_bg": "#FEE2E2",
+      "critical_text": "#991B1B",
+      "offline_bg": "#F3F4F6",
+      "offline_text": "#374151"
+    }
+  },
+  "surfaces_and_borders": {
+    "cards": "Flat solid background (#FFFFFF) with 1px border (#E5E7EB) and subtle shadow-sm. No hover lifts.",
+    "radius": "Moderate. Use rounded-md (6px) globally for inputs, cards, and buttons.",
+    "overlays": "Solid #FFFFFF background. CRITICAL: NO transparent or glassmorphism overlays. Modal backdrops should be bg-black/40 (flat dimming, no blur)."
+  },
+  "grids_and_layouts": {
+    "density": "High density. Use tight gaps (gap-4). Tables should be compact with p-2 or p-3 cell padding.",
+    "dashboard": "grid-cols-1 md:grid-cols-4. Summary cards take 1 col. Tables span full width.",
+    "sidebar": "Fixed width (256px), solid #FFFFFF, 1px right border (#E5E7EB). Distinct active state (bg-blue-50 text-blue-800 border-r-2 border-blue-800)."
+  },
+  "motion": {
+    "global": "Extremely minimal. Just color transitions on hover (e.g., hover:bg-gray-50) using transition-colors duration-150. NO bouncy animations, NO parallax."
+  },
+  "icons": {
+    "library": "lucide-react",
+    "style": "Simple line icons. Size 16px to 20px. Stroke width 2px."
+  },
+  "component_instructions": {
+    "buttons": "Solid primary, outline secondary. No pills—use standard rectangles with rounded-md.",
+    "tables": "First-class citizens. Zebra striping (even:bg-gray-50), sticky headers (bg-gray-100 text-gray-700 font-semibold text-xs uppercase tracking-wider), clear border-b.",
+    "forms": "Labels must be bold and above inputs. Inputs must have clear borders (border-gray-300 focus:border-blue-800 focus:ring-1 focus:ring-blue-800).",
+    "badges": "Use semantic colors strictly for status (Operational, Pending, Critical). Rounded-full or rounded-md, text-xs font-medium px-2 py-0.5.",
+    "tabs": "Underline style or simple segmented controls. No floating bubbles."
+  },
+  "accessibility": {
+    "contrast": "Ensure all text, especially gray secondary text, meets 4.5:1 ratio.",
+    "testing": "All interactive elements MUST have data-testid attributes (e.g., data-testid='login-submit', data-testid='report-problem-btn')."
+  },
+  "instructions_to_main_agent": [
+    "Use pure .js/.jsx. DO NOT use TypeScript (.tsx).",
+    "Do not invent new colors. Stick strictly to the defined utilitarian palette.",
+    "Avoid any 'glow' or 'neon' effects. Delete any default box-shadows that look like glowing rings.",
+    "Tables are the heart of this app. Make them readable, compact, and scannable.",
+    "The troubleshooting chat UI should look like a standard enterprise chat (e.g., MS Teams or Slack), NOT a glowing AI orb.",
+    "Ensure the layout has a left Sidebar and a top header. The sidebar holds main navigation, header holds user profile and breadcrumbs.",
+    "For the login page, use a simple centered card layout on a gray background. No huge illustrations."
+  ],
+  "universal_guidelines": [
+    "Do not apply global transitions (e.g., `transition: all`). Apply transitions explicitly to colors/opacity.",
+    "Never center-align whole pages. Left-align content for natural reading flow.",
+    "Add data-testid to every clickable item, form input, and key data point.",
+    "Install lucide-react if not present, but it usually is.",
+    "No empty states with giant illustrations. Use simple text 'No records found.' and a plain icon."
+  ]
+}
